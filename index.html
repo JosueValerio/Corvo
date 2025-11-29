@@ -10,39 +10,62 @@
         theme: {
           extend: {
             colors: {
-              primary: '#312e81', // Indigo 900 (Corvo Deep Blue)
-              accent: '#6366f1', // Indigo 500 (Highlights)
-              secondary: '#64748b', // Slate 500
-              dark: '#0f172a', // Slate 900 (Corvo Black)
-              danger: '#dc2626', // Red 600
-              success: '#059669', // Emerald 600
+              // Brand Palette Mappings
+              primary: '#397BFF', // Blue Main
+              'primary-dark': '#2F64E0', // Blue Dark
+              'primary-light': '#D5E0F9', // Blue Light
+              
+              secondary: '#A2A2A2', // Black Light
+              
+              dark: '#161616', // Black Dark (Backgrounds)
+              'dark-surface': '#282828', // Black Main (Cards/Sidebar)
+              
+              success: '#43D668', // Green Main
+              'success-dark': '#319947', // Green Dark
+              'success-light': '#D9F7E1', // Green Light
+              
+              background: '#F9F9F8', // White Light (App Background)
+              'surface': '#ffffff', // Pure White for Cards
+              'surface-alt': '#EDE9E0', // White Main
             },
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
+              sans: ['Rubik', 'sans-serif'],
+              display: ['Quicksand', 'sans-serif'],
+            },
+            borderRadius: {
+              'xl': '12px',
+              '2xl': '16px',
             }
           }
         }
       }
     </script>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&family=Rubik:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300&display=swap');
+      
       body {
-        font-family: 'Inter', sans-serif;
-        background-color: #f1f5f9; /* Slate 100 */
+        font-family: 'Rubik', sans-serif;
+        background-color: #F9F9F8; /* White Light */
+        color: #282828; /* Black Main */
       }
-      /* Custom Scrollbar for Corvo Feel */
+      
+      h1, h2, h3, h4, h5, h6 {
+        font-weight: 700; /* Bold/ExtraBold for headings */
+      }
+
+      /* Custom Scrollbar */
       ::-webkit-scrollbar {
         width: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #f1f5f9; 
+        background: #F9F9F8; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #cbd5e1; 
+        background: #A2A2A2; /* Black Light */
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; 
+        background: #282828; /* Black Main */
       }
     </style>
   <script type="importmap">

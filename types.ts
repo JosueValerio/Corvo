@@ -14,6 +14,7 @@ export interface User {
   name: string;
   email: string;
   role: Role;
+  jobTitle?: string; // e.g. "Gestor de Tráfego", "Designer"
   avatarUrl?: string;
   teamId?: string;
 }
@@ -42,8 +43,24 @@ export interface Task {
   assignedToUserId?: string; 
   clientId: string;
   dueDate?: string;
+  completedAt?: string; // New: For Dashboard Filtering
   createdByUserId: string; // New
   comments: TaskComment[]; // New
+}
+
+export interface ClientCommission {
+    userId: string;
+    percentage: number; // e.g., 10 for 10%
+}
+
+export interface ClientFile {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  uploadedByUserId: string;
+  uploadedAt: string;
 }
 
 export interface Client {
@@ -61,6 +78,8 @@ export interface Client {
   assignedUserIds: string[]; // Users with specific access
   managerId?: string; // Responsible Account Manager
   teamId?: string; // Responsible Squad/Team
+  commissions?: ClientCommission[]; // Commission configuration
+  files: ClientFile[]; // New: Generic files
 }
 
 export interface AuthState {

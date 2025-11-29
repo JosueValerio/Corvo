@@ -4,14 +4,14 @@ import { useApp } from '../context/AppContext';
 import { Role, TaskStatus, Client, Task } from '../types';
 import { generateBriefingSuggestions } from '../services/gemini';
 import { TaskModal } from '../components/TaskModal';
-import { Save, Trash, FileText, Lock, CheckSquare, Wand2, Eye, EyeOff, UploadCloud, Download, AlertTriangle, Edit2, X, Phone, Building, Briefcase, UserCircle, Users } from 'lucide-react';
+import { Save, Trash, FileText, Lock, CheckSquare, Wand2, Eye, EyeOff, UploadCloud, Download, AlertTriangle, Edit2, X, Phone, Building, Briefcase, UserCircle, Users, DollarSign, File as FileIcon, Paperclip } from 'lucide-react';
 
-type Tab = 'BRIEFING' | 'ACCESS' | 'TASKS' | 'CONTRACT';
+type Tab = 'BRIEFING' | 'ACCESS' | 'TASKS' | 'FILES' | 'CONTRACT';
 
 export const ClientDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { clients, users, teams, tasks, auth, updateClient, deleteClient, addTask, updateTask, deleteTask, uploadContract, deleteContract } = useApp();
+  const { clients, users, teams, tasks, auth, updateClient, deleteClient, addTask, updateTask, deleteTask, uploadContract, deleteContract, uploadClientFile, deleteClientFile } = useApp();
   
   const [activeTab, setActiveTab] = useState<Tab>('BRIEFING');
   const [isLoadingAI, setIsLoadingAI] = useState(false);
@@ -21,7 +21,7 @@ export const ClientDetails: React.FC = () => {
   // Task Modal
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
-  // Contract Upload State
+  // Contract/File Upload State
   const [isUploading, setIsUploading] = useState(false);
 
   // Client Data States (for direct editing in tabs)
@@ -101,12 +101,75 @@ export const ClientDetails: React.FC = () => {
     setNewTaskTitle('');
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Contract Upload
+  const handleContractUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        if (file.type !== 'application/pdf') {
+            alert('Apenas arquivos PDF são permitidos.');
+            return;
+        }
         setIsUploading(true);
-        await uploadContract(client.id, e.target.files[0]);
-        setIsUploading(false);
+        try {
+            await uploadContract(client.id, file);
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao fazer upload.');
+        } finally {
+            setIsUploading(false);
+        }
     }
+  };
+
+  // Generic File Upload (Max 64MB)
+  const handleGenericFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        
+        // Check size (64MB)
+        const maxSize = 64 * 1024 * 1024; // 64MB in bytes
+        if (file.size > maxSize) {
+            alert('O arquivo excede o limite de 64MB.');
+            return;
+        }
+
+        setIsUploading(true);
+        try {
+            await uploadClientFile(client.id, file);
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao enviar arquivo.');
+        } finally {
+            setIsUploading(false);
+        }
+    }
+  };
+
+  // Commission Handler
+  const handleCommissionChange = (userId: string, percentage: number) => {
+      const currentCommissions = editFormData.commissions || [];
+      const existingIndex = currentCommissions.findIndex(c => c.userId === userId);
+      
+      let newCommissions = [...currentCommissions];
+      if (existingIndex >= 0) {
+          if (percentage === 0) {
+              newCommissions = newCommissions.filter(c => c.userId !== userId);
+          } else {
+              newCommissions[existingIndex] = { userId, percentage };
+          }
+      } else if (percentage > 0) {
+          newCommissions.push({ userId, percentage });
+      }
+      
+      setEditFormData({ ...editFormData, commissions: newCommissions });
+  };
+
+  const formatFileSize = (bytes: number) => {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const clientTasks = tasks.filter(t => t.clientId === client.id);
@@ -167,6 +230,7 @@ export const ClientDetails: React.FC = () => {
             { id: 'BRIEFING', label: 'Briefing & Estratégia', icon: FileText },
             { id: 'ACCESS', label: 'Segurança & Acessos', icon: Lock },
             { id: 'TASKS', label: `Tarefas (${clientTasks.length})`, icon: CheckSquare },
+            { id: 'FILES', label: `Arquivos (${client.files?.length || 0})`, icon: Paperclip },
             ...(isAdmin ? [{ id: 'CONTRACT', label: 'Contrato', icon: FileText }] : [])
         ].map(tab => (
             <button 
@@ -203,7 +267,7 @@ export const ClientDetails: React.FC = () => {
                 <textarea 
                     value={briefing}
                     onChange={(e) => setBriefing(e.target.value)}
-                    className="w-full h-96 p-6 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none font-mono text-sm leading-relaxed"
+                    className="w-full h-96 p-6 rounded-xl border border-indigo-900/30 bg-slate-900 text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none font-mono text-sm leading-relaxed shadow-inner placeholder-slate-500"
                     placeholder="Descreva o briefing..."
                 />
             </div>
@@ -288,46 +352,159 @@ export const ClientDetails: React.FC = () => {
             </div>
         )}
 
+        {/* FILES TAB (NEW) */}
+        {activeTab === 'FILES' && (
+             <div className="space-y-6">
+                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-indigo-50/50 transition-colors">
+                    {isUploading ? (
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-3"></div>
+                            <p className="text-primary font-medium">Enviando arquivo...</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="bg-white p-4 rounded-full shadow-sm mb-4">
+                                <UploadCloud size={32} className="text-primary" />
+                            </div>
+                            <h3 className="text-lg font-bold text-slate-800 mb-1">Upload de Arquivos</h3>
+                            <p className="text-sm text-slate-500 mb-6">Todos os formatos aceitos. Tamanho máximo: 64MB.</p>
+                            <label className="cursor-pointer bg-primary text-white px-6 py-3 rounded-lg font-bold shadow hover:bg-indigo-700 transition-colors">
+                                Selecionar Arquivo
+                                <input type="file" onChange={handleGenericFileUpload} className="hidden" />
+                            </label>
+                        </>
+                    )}
+                </div>
+
+                <div className="space-y-3">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">Arquivos Enviados ({client.files?.length || 0})</h3>
+                    {(!client.files || client.files.length === 0) && (
+                        <p className="text-center text-slate-400 italic py-8">Nenhum arquivo encontrado.</p>
+                    )}
+                    {client.files?.map(file => {
+                        const uploader = users.find(u => u.id === file.uploadedByUserId);
+                        return (
+                            <div key={file.id} className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-lg hover:border-primary/50 transition-colors">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500">
+                                        <FileIcon size={20}/>
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-slate-900 truncate max-w-[200px] md:max-w-md">{file.name}</p>
+                                        <p className="text-xs text-slate-500 flex items-center gap-2">
+                                            <span>{formatFileSize(file.size)}</span>
+                                            <span>•</span>
+                                            <span>{new Date(file.uploadedAt).toLocaleDateString()}</span>
+                                            <span>•</span>
+                                            <span>Enviado por {uploader?.name || 'Desconhecido'}</span>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <a 
+                                        href={file.url} 
+                                        target="_blank" 
+                                        rel="noreferrer" 
+                                        download={file.name}
+                                        className="p-2 text-slate-500 hover:text-primary hover:bg-indigo-50 rounded-lg transition-colors" 
+                                        title="Baixar"
+                                    >
+                                        <Download size={18}/>
+                                    </a>
+                                    <button 
+                                        onClick={() => {
+                                            if(window.confirm('Excluir este arquivo?')) deleteClientFile(client.id, file.id);
+                                        }}
+                                        className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Excluir"
+                                    >
+                                        <Trash size={18}/>
+                                    </button>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+             </div>
+        )}
+
         {/* CONTRACT TAB */}
         {activeTab === 'CONTRACT' && isAdmin && (
-            <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                <div className="bg-white p-4 rounded-full shadow-sm mb-4">
-                    <FileText size={32} className="text-primary" />
-                </div>
+            <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
                 
                 {client.contractUrl && client.contractUrl !== '#' ? (
-                    <div className="text-center">
-                        <h3 className="text-slate-900 font-bold text-lg">Contrato Vigente</h3>
-                        <p className="text-slate-500 text-sm mb-6">Arquivo PDF armazenado com segurança.</p>
-                        <div className="flex gap-3 justify-center">
-                            <a href={client.contractUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-700 hover:border-primary hover:text-primary transition-colors shadow-sm font-medium">
-                                <Download size={16} /> Baixar
+                    <div className="text-center w-full max-w-md animate-fade-in">
+                        <div className="bg-white p-4 rounded-full shadow-sm mb-4 inline-block">
+                            <FileText size={48} className="text-emerald-600" />
+                        </div>
+                        <h3 className="text-slate-900 font-bold text-lg mb-1">Contrato Vigente</h3>
+                        <p className="text-slate-500 text-sm mb-8">Documento armazenado e vinculado.</p>
+                        
+                        <div className="flex gap-4 justify-center mb-8">
+                            <a 
+                                href={client.contractUrl} 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-700 hover:border-emerald-500 hover:text-emerald-600 transition-all shadow-sm font-medium"
+                            >
+                                <Download size={18} /> Visualizar PDF
                             </a>
-                            <button onClick={() => deleteContract(client.id)} className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-red-600 hover:bg-red-100 transition-colors shadow-sm font-medium">
-                                <Trash size={16} /> Excluir
+                            <button 
+                                onClick={() => {
+                                    if(window.confirm('Tem certeza que deseja remover o contrato atual?')) {
+                                        deleteContract(client.id);
+                                    }
+                                }} 
+                                className="flex items-center gap-2 px-5 py-2.5 bg-white border border-red-200 rounded-lg text-red-600 hover:bg-red-50 transition-all shadow-sm font-medium"
+                            >
+                                <Trash size={18} /> Remover
                             </button>
                         </div>
-                        <div className="mt-6 pt-6 border-t border-slate-200">
-                             <label className="text-xs text-slate-400 uppercase font-bold mb-2 block">Substituir Arquivo</label>
-                             <input type="file" accept=".pdf" onChange={handleFileUpload} className="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
+
+                        <div className="relative border-t border-slate-200 pt-6">
+                            <p className="text-xs text-slate-400 uppercase font-bold mb-3">Substituir Documento</p>
+                            <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors font-medium text-sm">
+                                <UploadCloud size={16} />
+                                <span>Escolher novo arquivo...</span>
+                                <input 
+                                    type="file" 
+                                    accept=".pdf" 
+                                    onChange={handleContractUpload} 
+                                    className="hidden" 
+                                />
+                            </label>
+                            {isUploading && <p className="text-xs text-indigo-600 mt-2 animate-pulse">Enviando novo arquivo...</p>}
                         </div>
                     </div>
                 ) : (
                     <div className="text-center w-full max-w-md">
-                        <h3 className="text-slate-900 font-bold mb-2">Nenhum contrato anexado</h3>
+                        <div className="bg-indigo-50 p-6 rounded-full inline-block mb-4">
+                            <UploadCloud size={40} className="text-indigo-600" />
+                        </div>
+                        <h3 className="text-slate-900 font-bold text-xl mb-2">Upload de Contrato</h3>
+                        <p className="text-slate-500 text-sm mb-8 px-8">Nenhum contrato vinculado a este cliente. Faça upload do PDF para arquivamento seguro.</p>
                         
                         {isUploading ? (
-                             <div className="flex items-center justify-center gap-2 text-indigo-600">
-                                <UploadCloud className="animate-bounce" /> Enviando...
+                             <div className="flex flex-col items-center justify-center gap-3 text-indigo-600 p-8 bg-white rounded-xl shadow-sm border border-indigo-100">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                <span className="font-medium animate-pulse">Processando arquivo...</span>
                              </div>
                         ) : (
-                            <div className="relative">
-                                <input type="file" accept=".pdf" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                                <button className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-lg hover:bg-indigo-900 transition-colors shadow-lg w-full pointer-events-none">
-                                    <UploadCloud size={20} /> Upload PDF
-                                </button>
-                            </div>
+                            <label className="cursor-pointer relative group block w-full">
+                                <div className="absolute inset-0 bg-primary opacity-0 group-hover:opacity-5 rounded-lg transition-opacity"></div>
+                                <div className="relative flex items-center justify-center gap-3 px-8 py-4 bg-primary text-white rounded-lg hover:bg-indigo-800 transition-all shadow-lg transform group-hover:-translate-y-0.5">
+                                    <UploadCloud size={24} />
+                                    <span className="font-bold">Selecionar Arquivo PDF</span>
+                                </div>
+                                <input 
+                                    type="file" 
+                                    accept=".pdf" 
+                                    onChange={handleContractUpload} 
+                                    className="hidden" 
+                                />
+                            </label>
                         )}
+                        <p className="text-xs text-slate-400 mt-4">Formatos aceitos: PDF (Max 10MB)</p>
                     </div>
                 )}
             </div>
@@ -393,6 +570,34 @@ export const ClientDetails: React.FC = () => {
                                 ))}
                             </select>
                         </div>
+                      </div>
+                      
+                      {/* Commissions Section */}
+                      <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
+                           <h3 className="text-sm font-bold text-emerald-900 mb-3 flex items-center gap-2">
+                               <DollarSign size={16}/> Comissões (% do Mensal)
+                           </h3>
+                           <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
+                               {users.map(u => {
+                                   const currentComm = editFormData.commissions?.find(c => c.userId === u.id)?.percentage || 0;
+                                   return (
+                                       <div key={u.id} className="flex justify-between items-center bg-white p-2 rounded border border-emerald-100">
+                                            <span className="text-sm text-slate-700">{u.name}</span>
+                                            <div className="flex items-center gap-1">
+                                                <input 
+                                                    type="number" 
+                                                    min="0" 
+                                                    max="100" 
+                                                    className="w-16 border p-1 rounded text-right"
+                                                    value={currentComm}
+                                                    onChange={(e) => handleCommissionChange(u.id, Number(e.target.value))}
+                                                />
+                                                <span className="text-sm text-slate-500">%</span>
+                                            </div>
+                                       </div>
+                                   )
+                               })}
+                           </div>
                       </div>
 
                       <div>

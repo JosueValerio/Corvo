@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Link } from 'react-router-dom';
-import { Plus, Search, MoreHorizontal, User } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, User, DollarSign } from 'lucide-react';
 import { Role } from '../types';
 
 export const Clients: React.FC = () => {
@@ -36,7 +36,8 @@ export const Clients: React.FC = () => {
         briefing: '',
         accessCredentials: '',
         assignedUserIds: [],
-        contractUrl: '#'
+        contractUrl: '#',
+        files: []
     });
     setIsModalOpen(false);
     setNewClientName('');
@@ -70,41 +71,60 @@ export const Clients: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredClients.map(client => (
-          <Link to={`/clients/${client.id}`} key={client.id} className="block group">
-            <div className={`
-              bg-white p-6 rounded-xl border transition-all duration-200 shadow-sm hover:shadow-md
-              ${client.status === 'INACTIVE' ? 'border-red-100 bg-red-50/10' : 'border-slate-100 hover:border-primary/30'}
-            `}>
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
-                  {client.name.substring(0, 1)}
-                </div>
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${client.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                  {client.status === 'ACTIVE' ? 'Ativo' : 'Inativo'}
-                </span>
-              </div>
-              
-              <h3 className="text-lg font-bold text-slate-900 mb-1 group-hover:text-primary transition-colors">{client.name}</h3>
-              {isAdmin && (
-                 <p className="text-slate-500 text-sm mb-4">Mensal: R$ {client.monthlyFee}</p>
-              )}
+        {filteredClients.map(client => {
+          // Calculate Commission for current user
+          const userCommission = client.commissions?.find(c => c.userId === auth.user?.id);
+          const commissionValue = userCommission ? (client.monthlyFee * userCommission.percentage) / 100 : 0;
 
-              <div className="flex items-center -space-x-2 mt-4">
-                {client.assignedUserIds.map(uid => {
-                    const u = users.find(user => user.id === uid);
-                    if(!u) return null;
-                    return (
-                        <img key={uid} src={u.avatarUrl} alt={u.name} className="w-8 h-8 rounded-full border-2 border-white" title={u.name} />
-                    )
-                })}
-                {client.assignedUserIds.length === 0 && (
-                    <span className="text-xs text-slate-400 italic">Sem atribuição</span>
+          return (
+            <Link to={`/clients/${client.id}`} key={client.id} className="block group">
+              <div className={`
+                bg-white p-6 rounded-xl border transition-all duration-200 shadow-sm hover:shadow-md
+                ${client.status === 'INACTIVE' ? 'border-red-100 bg-red-50/10' : 'border-slate-100 hover:border-primary/30'}
+              `}>
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
+                    {client.name.substring(0, 1)}
+                  </div>
+                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${client.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {client.status === 'ACTIVE' ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
+                
+                <h3 className="text-lg font-bold text-slate-900 mb-1 group-hover:text-primary transition-colors">{client.name}</h3>
+                
+                {isAdmin ? (
+                   <p className="text-slate-500 text-sm mb-4">Mensal: R$ {client.monthlyFee.toLocaleString('pt-BR')}</p>
+                ) : (
+                   userCommission ? (
+                      <div className="mb-4 bg-emerald-50 border border-emerald-100 p-2 rounded-lg inline-block">
+                          <p className="text-emerald-700 text-sm font-bold flex items-center gap-1">
+                              <DollarSign size={14}/> 
+                              Comissão: R$ {commissionValue.toLocaleString('pt-BR')}
+                              <span className="text-xs text-emerald-600 font-normal">({userCommission.percentage}%)</span>
+                          </p>
+                      </div>
+                   ) : (
+                      <p className="text-slate-400 text-xs mb-4 italic">Sem comissão atribuída</p>
+                   )
                 )}
+  
+                <div className="flex items-center -space-x-2 mt-4">
+                  {client.assignedUserIds.map(uid => {
+                      const u = users.find(user => user.id === uid);
+                      if(!u) return null;
+                      return (
+                          <img key={uid} src={u.avatarUrl} alt={u.name} className="w-8 h-8 rounded-full border-2 border-white" title={u.name} />
+                      )
+                  })}
+                  {client.assignedUserIds.length === 0 && (
+                      <span className="text-xs text-slate-400 italic">Sem atribuição</span>
+                  )}
+                </div>
               </div>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
 
       {/* Simple Modal for Create Client */}

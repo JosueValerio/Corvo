@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { User, Client, Task, AuthState, Role, Team } from '../types';
+import { User, Client, Task, AuthState, Role, Team, ClientFile } from '../types';
 import { MOCK_CLIENTS, MOCK_TASKS, MOCK_USERS, MOCK_TEAMS } from '../constants';
 
 interface AppContextType {
@@ -14,12 +14,19 @@ interface AppContextType {
   logout: () => void;
   updateUserProfile: (id: string, name: string, email: string, avatarUrl?: string) => void;
 
+  // User Management (Admin)
+  addUser: (user: User) => void;
+  updateUser: (user: User) => void;
+  deleteUser: (id: string) => void;
+
   // Clients
   addClient: (client: Client) => void;
   updateClient: (client: Client) => void; // Full update (PUT)
   deleteClient: (id: string) => void;
   uploadContract: (clientId: string, file: File) => Promise<void>;
   deleteContract: (clientId: string) => void;
+  uploadClientFile: (clientId: string, file: File) => Promise<void>; // New
+  deleteClientFile: (clientId: string, fileId: string) => void; // New
 
   // Tasks
   addTask: (task: Task) => void;
@@ -67,6 +74,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  // --- User CRUD (Admin) ---
+  const addUser = (user: User) => setUsers([...users, user]);
+  
+  const updateUser = (updatedUser: User) => {
+    setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
+  };
+
+  const deleteUser = (id: string) => {
+    setUsers(users.filter(u => u.id !== id));
+  };
+
   // --- Clients ---
   const addClient = (client: Client) => setClients([...clients, client]);
   
@@ -88,6 +106,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setClients(prev => prev.map(c => 
         c.id === clientId ? { ...c, contractUrl: undefined } : c
     ));
+  };
+
+  const uploadClientFile = async (clientId: string, file: File): Promise<void> => {
+    // Simulate API Delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const newFile: ClientFile = {
+      id: `f${Date.now()}`,
+      name: file.name,
+      url: URL.createObjectURL(file),
+      type: file.type,
+      size: file.size,
+      uploadedByUserId: auth.user?.id || 'unknown',
+      uploadedAt: new Date().toISOString()
+    };
+
+    setClients(prev => prev.map(c => 
+      c.id === clientId 
+        ? { ...c, files: [...(c.files || []), newFile] }
+        : c
+    ));
+  };
+
+  const deleteClientFile = (clientId: string, fileId: string) => {
+     setClients(prev => prev.map(c => 
+       c.id === clientId 
+        ? { ...c, files: c.files?.filter(f => f.id !== fileId) || [] }
+        : c
+     ));
   };
 
   // --- Tasks ---
@@ -115,11 +162,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         login,
         logout,
         updateUserProfile,
+        addUser,
+        updateUser,
+        deleteUser,
         addClient,
         updateClient,
         deleteClient,
         uploadContract,
         deleteContract,
+        uploadClientFile,
+        deleteClientFile,
         addTask,
         updateTask,
         deleteTask,
