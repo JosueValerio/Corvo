@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Role, TaskStatus } from '../types';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { CheckCircle, Clock, Users, DollarSign, Briefcase, PieChart as PieChartIcon, ChevronLeft, ChevronRight, Calendar, ArrowRight, X } from 'lucide-react';
+import { CheckCircle, Clock, Users, DollarSign, Briefcase, PieChart as PieChartIcon, ChevronLeft, ChevronRight, Calendar, ArrowRight, X, Download } from 'lucide-react';
 
 const COLORS = ['#312e81', '#6366f1', '#94a3b8', '#cbd5e1'];
 
@@ -120,6 +120,42 @@ export const Dashboard: React.FC = () => {
     { name: 'Concluídas', value: doneTasks },
   ];
 
+  const handleExportCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,";
+
+    if (isAdmin) {
+        // Admin: Export Team Performance
+        csvContent += "Colaborador,Cargo,Entregas (Mes),Pendencias (Mes),Comissao Estimada\n";
+        teamPerformance.forEach(row => {
+            csvContent += `${row.user.name},${row.user.jobTitle},${row.completed},${row.pending},${row.commission}\n`;
+        });
+        // Append overall metrics
+        csvContent += `\nFaturamento Total,R$ ${totalRevenue}\n`;
+        csvContent += `Clientes Ativos,${activeClientsInMonth.length}\n`;
+    } else {
+        // User: Export My Tasks & Commission
+        csvContent += "Cliente,Valor Comissao,Percentual\n";
+        commissionDetails.forEach(row => {
+            csvContent += `${row.clientName},${row.amount},${row.percentage}%\n`;
+        });
+        csvContent += `\nTotal Comissoes,R$ ${totalCommission}\n`;
+        csvContent += `\nTAREFAS\nTitulo,Status,Prazo\n`;
+        myTasks.forEach(t => {
+            if (isInSelectedMonth(t.dueDate) || isInSelectedMonth(t.completedAt)) {
+                csvContent += `${t.title},${t.status},${t.dueDate}\n`;
+            }
+        });
+    }
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `dashboard_report_${currentDate.toISOString().slice(0,7)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-8">
       {/* Header & Date Picker */}
@@ -129,17 +165,26 @@ export const Dashboard: React.FC = () => {
             <p className="text-slate-500">Visão geral de desempenho e atividades.</p>
         </div>
 
-        <div className="flex items-center gap-4 bg-white p-2 rounded-lg shadow-sm border border-slate-200">
-            <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors">
-                <ChevronLeft size={20} />
+        <div className="flex items-center gap-2">
+            <button 
+                onClick={handleExportCSV}
+                className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors text-sm font-bold shadow-sm"
+            >
+                <Download size={16}/> Exportar
             </button>
-            <div className="flex items-center gap-2 px-4 min-w-[180px] justify-center">
-                <Calendar size={18} className="text-primary"/>
-                <span className="font-bold text-slate-800 capitalize select-none">{formattedDate}</span>
+            
+            <div className="flex items-center gap-4 bg-white p-2 rounded-lg shadow-sm border border-slate-200">
+                <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors">
+                    <ChevronLeft size={20} />
+                </button>
+                <div className="flex items-center gap-2 px-4 min-w-[180px] justify-center">
+                    <Calendar size={18} className="text-primary"/>
+                    <span className="font-bold text-slate-800 capitalize select-none">{formattedDate}</span>
+                </div>
+                <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors">
+                    <ChevronRight size={20} />
+                </button>
             </div>
-            <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors">
-                <ChevronRight size={20} />
-            </button>
         </div>
       </div>
 

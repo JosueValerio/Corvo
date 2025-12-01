@@ -23,9 +23,9 @@ interface AppContextType {
   addClient: (client: Client) => void;
   updateClient: (client: Client) => void; // Full update (PUT)
   deleteClient: (id: string) => void;
-  uploadContract: (clientId: string, file: File) => Promise<void>;
+  uploadContract: (clientId: string, file: File, onProgress?: (progress: number) => void) => Promise<void>;
   deleteContract: (clientId: string) => void;
-  uploadClientFile: (clientId: string, file: File) => Promise<void>; // New
+  uploadClientFile: (clientId: string, file: File, onProgress?: (progress: number) => void) => Promise<void>; // New
   deleteClientFile: (clientId: string, fileId: string) => void; // New
 
   // Tasks
@@ -94,9 +94,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   
   const deleteClient = (id: string) => setClients(clients.filter((c) => c.id !== id));
 
-  const uploadContract = async (clientId: string, file: File): Promise<void> => {
-    // Simulate API Delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+  const simulateProgress = (onProgress?: (p: number) => void) => {
+      return new Promise<void>((resolve) => {
+          let progress = 0;
+          const interval = setInterval(() => {
+              progress += 10;
+              if (onProgress) onProgress(progress);
+              if (progress >= 100) {
+                  clearInterval(interval);
+                  resolve();
+              }
+          }, 150); // Total ~1.5s
+      });
+  };
+
+  const uploadContract = async (clientId: string, file: File, onProgress?: (progress: number) => void): Promise<void> => {
+    await simulateProgress(onProgress);
     setClients(prev => prev.map(c => 
         c.id === clientId ? { ...c, contractUrl: URL.createObjectURL(file) } : c
     ));
@@ -108,9 +121,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     ));
   };
 
-  const uploadClientFile = async (clientId: string, file: File): Promise<void> => {
-    // Simulate API Delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  const uploadClientFile = async (clientId: string, file: File, onProgress?: (progress: number) => void): Promise<void> => {
+    await simulateProgress(onProgress);
     
     const newFile: ClientFile = {
       id: `f${Date.now()}`,

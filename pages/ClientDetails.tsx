@@ -23,6 +23,7 @@ export const ClientDetails: React.FC = () => {
 
   // Contract/File Upload State
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Client Data States (for direct editing in tabs)
   const [briefing, setBriefing] = useState('');
@@ -110,13 +111,15 @@ export const ClientDetails: React.FC = () => {
             return;
         }
         setIsUploading(true);
+        setUploadProgress(0);
         try {
-            await uploadContract(client.id, file);
+            await uploadContract(client.id, file, (progress) => setUploadProgress(progress));
         } catch (error) {
             console.error(error);
             alert('Erro ao fazer upload.');
         } finally {
             setIsUploading(false);
+            setUploadProgress(0);
         }
     }
   };
@@ -134,13 +137,15 @@ export const ClientDetails: React.FC = () => {
         }
 
         setIsUploading(true);
+        setUploadProgress(0);
         try {
-            await uploadClientFile(client.id, file);
+            await uploadClientFile(client.id, file, (progress) => setUploadProgress(progress));
         } catch (error) {
             console.error(error);
             alert('Erro ao enviar arquivo.');
         } finally {
             setIsUploading(false);
+            setUploadProgress(0);
         }
     }
   };
@@ -357,9 +362,15 @@ export const ClientDetails: React.FC = () => {
              <div className="space-y-6">
                 <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-indigo-50/50 transition-colors">
                     {isUploading ? (
-                        <div className="text-center">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-3"></div>
-                            <p className="text-primary font-medium">Enviando arquivo...</p>
+                        <div className="text-center w-full max-w-xs">
+                            <div className="flex justify-between text-xs text-slate-500 mb-1 font-bold uppercase">
+                                <span>Enviando...</span>
+                                <span>{uploadProgress}%</span>
+                            </div>
+                            <div className="w-full bg-slate-200 rounded-full h-2.5 mb-2">
+                                <div className="bg-primary h-2.5 rounded-full transition-all duration-150" style={{ width: `${uploadProgress}%` }}></div>
+                            </div>
+                            <p className="text-primary font-medium text-sm animate-pulse">Processando arquivo...</p>
                         </div>
                     ) : (
                         <>
@@ -473,7 +484,14 @@ export const ClientDetails: React.FC = () => {
                                     className="hidden" 
                                 />
                             </label>
-                            {isUploading && <p className="text-xs text-indigo-600 mt-2 animate-pulse">Enviando novo arquivo...</p>}
+                            {isUploading && (
+                                <div className="mt-3 w-full max-w-[200px] mx-auto">
+                                    <div className="w-full bg-indigo-100 rounded-full h-1.5">
+                                        <div className="bg-indigo-600 h-1.5 rounded-full transition-all" style={{ width: `${uploadProgress}%` }}></div>
+                                    </div>
+                                    <p className="text-[10px] text-indigo-600 mt-1 text-center">Enviando {uploadProgress}%</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ) : (
@@ -486,8 +504,10 @@ export const ClientDetails: React.FC = () => {
                         
                         {isUploading ? (
                              <div className="flex flex-col items-center justify-center gap-3 text-indigo-600 p-8 bg-white rounded-xl shadow-sm border border-indigo-100">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                                <span className="font-medium animate-pulse">Processando arquivo...</span>
+                                <div className="w-full bg-indigo-100 rounded-full h-2">
+                                    <div className="bg-indigo-600 h-2 rounded-full transition-all duration-100" style={{ width: `${uploadProgress}%` }}></div>
+                                </div>
+                                <span className="font-medium animate-pulse text-sm">Carregando {uploadProgress}%</span>
                              </div>
                         ) : (
                             <label className="cursor-pointer relative group block w-full">

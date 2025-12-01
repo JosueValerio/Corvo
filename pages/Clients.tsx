@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Link } from 'react-router-dom';
-import { Plus, Search, MoreHorizontal, User, DollarSign } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, User, DollarSign, Filter, X } from 'lucide-react';
 import { Role } from '../types';
 
 export const Clients: React.FC = () => {
@@ -9,11 +9,20 @@ export const Clients: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
+  // Advanced Filters State
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [filterArea, setFilterArea] = useState<string>('ALL');
+  const [filterManager, setFilterManager] = useState<string>('ALL');
+
   // New Client Form State
   const [newClientName, setNewClientName] = useState('');
   const [newClientFee, setNewClientFee] = useState(0);
 
   const isAdmin = auth.user?.role === Role.ADMIN;
+
+  // Derived Options for Dropdowns
+  const uniqueAreas = Array.from(new Set(clients.map(c => c.area).filter(Boolean)));
+  const managers = users.filter(u => clients.some(c => c.managerId === u.id));
   
   const filteredClients = clients.filter(client => {
     // 1. Permission Check
@@ -21,7 +30,18 @@ export const Clients: React.FC = () => {
     if (!hasAccess) return false;
 
     // 2. Search Filter
-    return client.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // 3. Status Filter
+    const matchesStatus = filterStatus === 'ALL' || client.status === filterStatus;
+
+    // 4. Area Filter
+    const matchesArea = filterArea === 'ALL' || client.area === filterArea;
+
+    // 5. Manager Filter
+    const matchesManager = filterManager === 'ALL' || client.managerId === filterManager;
+
+    return matchesSearch && matchesStatus && matchesArea && matchesManager;
   });
 
   const handleCreateClient = (e: React.FormEvent) => {
@@ -44,6 +64,13 @@ export const Clients: React.FC = () => {
     setNewClientFee(0);
   };
 
+  const clearFilters = () => {
+      setFilterStatus('ALL');
+      setFilterArea('ALL');
+      setFilterManager('ALL');
+      setSearchTerm('');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -59,15 +86,58 @@ export const Clients: React.FC = () => {
         )}
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
-        <input 
-          type="text" 
-          placeholder="Buscar clientes..." 
-          className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none shadow-sm"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      {/* Advanced Filter Bar */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+            <input 
+              type="text" 
+              placeholder="Buscar por nome ou empresa..." 
+              className="w-full pl-10 pr-4 py-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none bg-slate-50 focus:bg-white transition-colors"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex flex-wrap gap-4 items-center">
+              <div className="flex items-center gap-2 text-sm text-slate-500 font-bold">
+                  <Filter size={16}/> Filtros:
+              </div>
+              
+              <select 
+                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white text-slate-700 focus:border-primary outline-none"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value as any)}
+              >
+                  <option value="ALL">Todos os Status</option>
+                  <option value="ACTIVE">Ativos</option>
+                  <option value="INACTIVE">Inativos</option>
+              </select>
+
+              <select 
+                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white text-slate-700 focus:border-primary outline-none"
+                  value={filterArea}
+                  onChange={(e) => setFilterArea(e.target.value)}
+              >
+                  <option value="ALL">Todas as Áreas</option>
+                  {uniqueAreas.map(area => <option key={area} value={area}>{area}</option>)}
+              </select>
+
+              <select 
+                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white text-slate-700 focus:border-primary outline-none"
+                  value={filterManager}
+                  onChange={(e) => setFilterManager(e.target.value)}
+              >
+                  <option value="ALL">Todos os Gestores</option>
+                  {managers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+
+              {(filterStatus !== 'ALL' || filterArea !== 'ALL' || filterManager !== 'ALL' || searchTerm) && (
+                  <button onClick={clearFilters} className="text-sm text-red-500 hover:text-red-700 flex items-center gap-1">
+                      <X size={14}/> Limpar
+                  </button>
+              )}
+          </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -92,6 +162,7 @@ export const Clients: React.FC = () => {
                 </div>
                 
                 <h3 className="text-lg font-bold text-slate-900 mb-1 group-hover:text-primary transition-colors">{client.name}</h3>
+                {client.area && <p className="text-xs text-slate-500 mb-2 uppercase tracking-wide">{client.area}</p>}
                 
                 {isAdmin ? (
                    <p className="text-slate-500 text-sm mb-4">Mensal: R$ {client.monthlyFee.toLocaleString('pt-BR')}</p>
@@ -125,6 +196,11 @@ export const Clients: React.FC = () => {
             </Link>
           );
         })}
+        {filteredClients.length === 0 && (
+            <div className="col-span-full py-12 text-center text-slate-500">
+                Nenhum cliente encontrado com os filtros selecionados.
+            </div>
+        )}
       </div>
 
       {/* Simple Modal for Create Client */}
